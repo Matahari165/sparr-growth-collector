@@ -67,6 +67,10 @@ def main():
             break
 
     with psycopg.connect(os.environ["NEON_DATABASE_URL"]) as conn, conn.cursor() as cur:
+        cur.execute("SELECT current_database(), current_schema(), "
+                    "(SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public')")
+        db_name, schema, n_tables = cur.fetchone()
+        print(f"Connected to database {db_name}, schema {schema}, {n_tables} tables")
         cur.execute(
             """INSERT INTO accounts (platform, handle, account_type, external_id)
                VALUES ('youtube', %s, %s, %s)
@@ -125,4 +129,6 @@ if __name__ == "__main__":
     try:
         main()
     except psycopg.Error as e:
-        sys.exit(f"Database error: {type(e).__name__}")
+        # message_primary only says e.g. 'relation "accounts" does not exist': no host, user or password.
+        detail = getattr(getattr(e, "diag", None), "message_primary", None) or ""
+        sys.exit(f"Database error: {type(e).__name__} {detail}".strip())
